@@ -1,0 +1,27 @@
+# deps
+node_modules/
+
+# build output
+dist/
+
+# env
+.env
+.env.local
+
+# database
+*.db
+*.db-shm
+*.db-wal
+backend/data/
+
+# uploads
+backend/uploads/
+
+# OS
+.DS_Store
+
+# editor
+.vscode/
+.idea/
+
+.claude/
