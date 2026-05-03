@@ -1,0 +1,56 @@
+{
+  "expo": {
+    "name": "The Wall",
+    "slug": "the-wall",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "userInterfaceStyle": "dark",
+    "newArchEnabled": true,
+    "splash": {
+      "image": "./assets/splash-icon.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#111008"
+    },
+    "ios": {
+      "supportsTablet": false,
+      "bundleIdentifier": "com.thewall.app",
+      "infoPlist": {
+        "NSBluetoothAlwaysUsageDescription": "The Wall uses Bluetooth to detect nearby users for tapping.",
+        "NSBluetoothPeripheralUsageDescription": "The Wall uses Bluetooth to detect nearby users for tapping.",
+        "NSCameraUsageDescription": "The Wall needs camera access to take photos.",
+        "NSPhotoLibraryUsageDescription": "The Wall needs photo library access to share photos.",
+        "NSPhotoLibraryAddUsageDescription": "The Wall needs permission to save photos."
+      }
+    },
+    "android": {
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/adaptive-icon.png",
+        "backgroundColor": "#111008"
+      },
+      "package": "com.thewall.app",
+      "permissions": [
+        "BLUETOOTH",
+        "BLUETOOTH_ADMIN",
+        "BLUETOOTH_SCAN",
+        "BLUETOOTH_CONNECT",
+        "BLUETOOTH_ADVERTISE",
+        "ACCESS_FINE_LOCATION",
+        "CAMERA",
+        "READ_EXTERNAL_STORAGE",
+        "WRITE_EXTERNAL_STORAGE"
+      ]
+    },
+    "plugins": [
+      "expo-font",
+      "expo-secure-store",
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "The Wall needs access to your photos.",
+          "cameraPermission": "The Wall needs camera access to take photos."
+        }
+      ]
+    ]
+  }
+}
