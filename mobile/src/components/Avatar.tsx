@@ -1,7 +1,8 @@
 import { View, Text, Image, StyleSheet } from 'react-native';
 import { colors, fonts } from '../lib/theme';
+import { BRANDING } from '../config/branding';
 
-const BASE = 'http://localhost:3000';
+const BASE = BRANDING.API_URL;
 
 interface Props {
   username: string;

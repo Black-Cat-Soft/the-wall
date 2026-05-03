@@ -1,4 +1,5 @@
-const BASE = 'http://localhost:3000';
+import { BRANDING } from '../config/branding';
+const BASE = BRANDING.API_URL;
 
 async function request<T>(
   path: string,

@@ -27,5 +27,5 @@ export const BRANDING = {
   HINT_SIMULATE: '(Tap button to simulate proximity)',
   
   // Backend
-  API_URL: process.env.API_URL || 'http://localhost:3000',
+  API_URL: process.env.EXPO_PUBLIC_API_URL || 'http://localhost:3000',
 } as const;

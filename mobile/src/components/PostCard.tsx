@@ -8,8 +8,9 @@ import { api, type Post } from '../lib/api';
 import { useAuth } from '../context/AuthContext';
 import Avatar from './Avatar';
 import { colors, fonts } from '../lib/theme';
+import { BRANDING } from '../config/branding';
 
-const BASE = 'http://localhost:3000';
+const BASE = BRANDING.API_URL;
 const SCREEN_W = Dimensions.get('window').width;
 const SPROCKET_COUNT = 7;
 const sprockets = Array.from({ length: SPROCKET_COUNT });

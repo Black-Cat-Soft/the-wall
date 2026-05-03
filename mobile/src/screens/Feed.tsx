@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import {
-  View, Text, FlatList, Pressable, StyleSheet, StatusBar, SafeAreaView,
+  View, Text, FlatList, Pressable, StyleSheet, StatusBar, SafeAreaView, Image,
 } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
@@ -8,6 +8,7 @@ import type { RootStackParamList } from '../navigation';
 import { api, type Post } from '../lib/api';
 import { useAuth } from '../context/AuthContext';
 import { colors, fonts } from '../lib/theme';
+import Avatar from '../components/Avatar';
 
 type Nav = NativeStackNavigationProp<RootStackParamList>;
 
@@ -63,9 +64,38 @@ export default function FeedScreen() {
         <FlatList
           data={posts}
           keyExtractor={p => String(p.id)}
-          renderItem={({ item, index }) => (
-            <View style={styles.postPlaceholder}>
-              <Text style={styles.postPlaceholderText}>POST #{index + 1}</Text>
+          renderItem={({ item }) => (
+            <View style={styles.postCard}>
+              {/* Author header */}
+              <Pressable 
+                style={styles.postHeader}
+                onPress={() => nav.navigate('Profile', { userId: item.author.id })}
+              >
+                <Avatar username={item.author.username} avatar={item.author.avatar} size={36} />
+                <Text style={styles.authorName}>{item.author.username.toUpperCase()}</Text>
+              </Pressable>
+
+              {/* Image */}
+              <Image 
+                source={{ uri: item.imageUrl }} 
+                style={styles.postImage}
+                resizeMode="cover"
+              />
+
+              {/* Caption & Actions */}
+              <View style={styles.postFooter}>
+                <Text style={styles.caption}>
+                  <Text style={styles.captionAuthor}>{item.author.username}</Text>
+                  {'  '}
+                  {item.caption}
+                </Text>
+                <View style={styles.postActions}>
+                  <Text style={styles.likeCount}>{item._count} likes</Text>
+                  <Pressable onPress={() => {/* TODO: toggle like */}}>
+                    <Text style={styles.likeBtn}>{item.isLiked ? '♥' : '♡'}</Text>
+                  </Pressable>
+                </View>
+              </View>
             </View>
           )}
           ListEmptyComponent={
@@ -155,21 +185,58 @@ const styles = StyleSheet.create({
     color: colors.muted,
   },
 
-  postPlaceholder: {
-    margin: 16,
-    height: 300,
-    backgroundColor: colors.card,
-    borderWidth: 1.5,
-    borderColor: colors.border,
-    borderRadius: 4,
-    alignItems: 'center',
-    justifyContent: 'center',
+  postCard: {
+    backgroundColor: colors.white,
+    marginBottom: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.border,
   },
-  postPlaceholderText: {
+  postHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+  },
+  authorName: {
     fontFamily: fonts.display,
-    fontSize: 20,
+    fontSize: 14,
+    letterSpacing: 1.5,
+    color: colors.ink,
+  },
+  postImage: {
+    width: '100%',
+    aspectRatio: 4 / 3,
+    backgroundColor: colors.card,
+  },
+  postFooter: {
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+  },
+  caption: {
+    fontFamily: fonts.mono,
+    fontSize: 13,
+    color: colors.ink,
+    lineHeight: 18,
+    marginBottom: 8,
+  },
+  captionAuthor: {
+    fontFamily: fonts.display,
+    fontWeight: '600',
+  },
+  postActions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  likeCount: {
+    fontFamily: fonts.mono,
+    fontSize: 11,
     color: colors.muted,
-    letterSpacing: 2,
+  },
+  likeBtn: {
+    fontSize: 24,
+    color: colors.red,
   },
 
   empty: { alignItems: 'center', gap: 12 },
