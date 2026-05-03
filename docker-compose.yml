@@ -1,3 +1,5 @@
+name: stray
+
 services:
   backend:
     build:
@@ -9,29 +11,13 @@ services:
     environment:
       NODE_ENV: development
       PORT: 3000
-      DATABASE_URL: ./data/the-wall.db
+      DATABASE_URL: ./data/app.db
       JWT_SECRET: dev_secret_change_in_prod
     volumes:
       - ./backend:/app
       - /app/node_modules
       - uploads_data:/app/uploads
     command: sh -c "npm run db:migrate && npm run db:seed && npm run start"
-
-  frontend:
-    build:
-      context: ./frontend
-      dockerfile: Dockerfile
-    restart: always
-    ports:
-      - "5173:5173"
-    environment:
-      NODE_ENV: development
-    volumes:
-      - ./frontend:/app
-      - /app/node_modules
-    depends_on:
-      - backend
-    command: npm run dev
 
 volumes:
   uploads_data:
