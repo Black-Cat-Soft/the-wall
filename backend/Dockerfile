@@ -1,20 +1,37 @@
-# Use a Node.js base image
-FROM node:20-alpine
+# Build stage
+FROM golang:1.26-alpine AS builder
 
-# Set the working directory inside the container
+WORKDIR /build
+
+# Install build dependencies
+RUN apk add --no-cache gcc musl-dev sqlite-dev
+
+# Copy go mod files
+COPY go.mod go.sum ./
+RUN go mod download
+
+# Copy source
+COPY *.go ./
+COPY schema.sql ./
+
+# Build binary
+RUN CGO_ENABLED=1 GOOS=linux go build -a -installsuffix cgo -o server .
+
+# Runtime stage
+FROM alpine:latest
+
 WORKDIR /app
 
-# Copy package.json and package-lock.json (if any)
-COPY package*.json ./
+# Install runtime dependencies
+RUN apk add --no-cache ca-certificates sqlite-libs
 
-# Install dependencies
-RUN npm install
+# Copy binary and schema
+COPY --from=builder /build/server .
+COPY --from=builder /build/schema.sql .
 
-# Copy the rest of the application code
-COPY . .
+# Create directories
+RUN mkdir -p /app/data /app/uploads
 
-# Expose the port the app runs on
 EXPOSE 3000
 
-# Command to run the application (for development, overridden by docker-compose)
-CMD ["npm", "run", "start"]
+CMD ["./server"]

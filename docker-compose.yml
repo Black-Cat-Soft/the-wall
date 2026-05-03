@@ -9,15 +9,12 @@ services:
     ports:
       - "3000:3000"
     environment:
-      NODE_ENV: development
-      PORT: 3000
-      DATABASE_URL: ./data/app.db
-      JWT_SECRET: dev_secret_change_in_prod
+      PORT: ${PORT}
+      DATABASE_URL: ${DATABASE_URL}
+      JWT_SECRET: ${JWT_SECRET}
     volumes:
-      - ./backend:/app
-      - /app/node_modules
+      - ./backend/data:/app/data
       - uploads_data:/app/uploads
-    command: sh -c "npm run db:migrate && npm run db:seed && npm run start"
 
 volumes:
   uploads_data:
