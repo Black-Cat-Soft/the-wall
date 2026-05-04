@@ -1,7 +1,7 @@
 // Bump service — BLE discovery + UWB ranging
 // Native layer hooks are stubbed; wire in react-native-ble-plx + NearbyInteraction module here.
 
-export type BumpServiceState = 'idle' | 'scanning' | 'found' | 'ranging' | 'confirmed' | 'error';
+export type BumpServiceState = 'scanning' | 'found' | 'ranging' | 'confirmed' | 'error';
 
 export interface NearbyPeer {
   userId: number;
@@ -15,7 +15,7 @@ type StateListener = (state: BumpServiceState, peer?: NearbyPeer) => void;
 
 class BumpService {
   private listeners: StateListener[] = [];
-  private state: BumpServiceState = 'idle';
+  private state: BumpServiceState = 'scanning';
 
   on(fn: StateListener) {
     this.listeners.push(fn);
@@ -39,7 +39,7 @@ class BumpService {
   stop() {
     // TODO: stop BLE scan + advertisement
     // TODO: stop UWB session
-    this.emit('idle');
+    this.emit('scanning');
   }
 
   getState() { return this.state; }

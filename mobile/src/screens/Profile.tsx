@@ -1,13 +1,19 @@
 import { useState, useEffect } from 'react';
 import {
-  View, Text, Pressable, StyleSheet, SafeAreaView, StatusBar, ScrollView,
+  View, Text, Pressable, StyleSheet, StatusBar, FlatList, Image, Dimensions,
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation, useRoute } from '@react-navigation/native';
 import type { NativeStackNavigationProp, NativeStackScreenProps } from '@react-navigation/native-stack';
 import type { RootStackParamList } from '../navigation';
-import { api, type UserProfile } from '../lib/api';
+import { api, type UserProfile, type Post } from '../lib/api';
 import { useAuth } from '../context/AuthContext';
 import { colors, fonts } from '../lib/theme';
+
+const SCREEN_WIDTH = Dimensions.get('window').width;
+const GRID_GAP = 2;
+const GRID_COLUMNS = 3;
+const GRID_ITEM_SIZE = (SCREEN_WIDTH - (GRID_GAP * (GRID_COLUMNS + 1))) / GRID_COLUMNS;
 
 type Nav   = NativeStackNavigationProp<RootStackParamList>;
 type Route = NativeStackScreenProps<RootStackParamList, 'Profile'>['route'];
@@ -53,6 +59,23 @@ export default function ProfileScreen() {
     } catch { /* silent */ }
   };
 
+  const handlePostPress = (post: Post) => {
+    nav.navigate('PostDetail', { postId: post.id });
+  };
+
+  const renderPostItem = ({ item }: { item: Post }) => (
+    <Pressable
+      style={styles.gridItem}
+      onPress={() => handlePostPress(item)}
+    >
+      <Image
+        source={{ uri: item.imageUrl }}
+        style={styles.gridImage}
+        resizeMode="cover"
+      />
+    </Pressable>
+  );
+
   if (loading || !profile) {
     return (
       <SafeAreaView style={styles.safe}>
@@ -82,47 +105,58 @@ export default function ProfileScreen() {
         )}
       </View>
 
-      <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 40 }}>
-        {/* hero */}
-        <View style={styles.hero}>
-          <View style={styles.avatarLg}>
-            <Text style={styles.avatarInitial}>
-              {profile.username[0].toUpperCase()}
-            </Text>
-          </View>
-          <View style={styles.heroMeta}>
-            <Text style={styles.heroName} numberOfLines={1}>
-              {profile.username.toUpperCase()}
-            </Text>
-            <View style={styles.stats}>
-              <View style={styles.stat}>
-                <Text style={styles.statNum}>{profile.posts.length}</Text>
-                <Text style={styles.statLabel}>SHOTS</Text>
-              </View>
-              <View style={styles.stat}>
-                <Text style={styles.statNum}>{profile.bumpCount}</Text>
-                <Text style={styles.statLabel}>BUMPS</Text>
-              </View>
+      <FlatList
+        ListHeaderComponent={
+          <View style={styles.hero}>
+            <View style={styles.avatarLg}>
+              <Text style={styles.avatarInitial}>
+                {profile.username[0].toUpperCase()}
+              </Text>
             </View>
-            {profile.bio ? <Text style={styles.bio}>{profile.bio}</Text> : null}
-            {!isOwn && (
-              <Pressable
-                style={[styles.bumpBtn, profile.bumpStatus === 'bumped' && styles.bumpBtnBumped]}
-                onPress={handleBump}
-              >
-                <Text style={[styles.bumpBtnText, profile.bumpStatus === 'bumped' && styles.bumpBtnTextBumped]}>
-                  {profile.bumpStatus === 'bumped' ? 'BUMPED ✦' : 'BUMP'}
-                </Text>
-              </Pressable>
-            )}
+            <View style={styles.heroMeta}>
+              <Text style={styles.heroName} numberOfLines={1}>
+                {profile.username.toUpperCase()}
+              </Text>
+              <View style={styles.stats}>
+                <View style={styles.stat}>
+                  <Text style={styles.statNum}>{profile.posts.length}</Text>
+                  <Text style={styles.statLabel}>SHOTS</Text>
+                </View>
+                <View style={styles.stat}>
+                  <Text style={styles.statNum}>{profile.bumpCount}</Text>
+                  <Text style={styles.statLabel}>BUMPS</Text>
+                </View>
+              </View>
+              {profile.bio ? <Text style={styles.bio}>{profile.bio}</Text> : null}
+              {!isOwn && (
+                <Pressable
+                  style={[styles.bumpBtn, profile.bumpStatus === 'bumped' && styles.bumpBtnBumped]}
+                  onPress={handleBump}
+                >
+                  <Text style={[styles.bumpBtnText, profile.bumpStatus === 'bumped' && styles.bumpBtnTextBumped]}>
+                    {profile.bumpStatus === 'bumped' ? 'BUMPED ✦' : 'BUMP'}
+                  </Text>
+                </Pressable>
+              )}
+            </View>
           </View>
-        </View>
-
-        {/* posts grid placeholder */}
-        <View style={styles.gridPlaceholder}>
-          <Text style={styles.gridPlaceholderText}>SHOTS COMING SOON</Text>
-        </View>
-      </ScrollView>
+        }
+        data={profile.posts}
+        renderItem={renderPostItem}
+        keyExtractor={(item) => String(item.id)}
+        numColumns={GRID_COLUMNS}
+        columnWrapperStyle={styles.gridRow}
+        showsVerticalScrollIndicator={false}
+        contentContainerStyle={{ paddingBottom: 40 }}
+        ListEmptyComponent={
+          <View style={styles.emptyGrid}>
+            <Text style={styles.emptyGridText}>NO SHOTS YET</Text>
+            <Text style={styles.emptyGridSubtext}>
+              {isOwn ? 'Tap the shutter to capture a moment' : 'Nothing developed yet'}
+            </Text>
+          </View>
+        }
+      />
     </SafeAreaView>
   );
 }
@@ -173,8 +207,9 @@ const styles = StyleSheet.create({
     padding: 20,
     gap: 16,
     backgroundColor: colors.paper,
-    borderBottomWidth: 2,
+    borderBottomWidth: 3,
     borderBottomColor: colors.border,
+    marginBottom: GRID_GAP,
   },
   avatarLg: {
     width: 76,
@@ -244,20 +279,38 @@ const styles = StyleSheet.create({
   },
   bumpBtnTextBumped: { color: colors.teal },
 
-  gridPlaceholder: {
-    margin: 16,
-    height: 200,
-    backgroundColor: colors.card,
-    borderWidth: 1.5,
-    borderColor: colors.border,
-    borderRadius: 4,
-    alignItems: 'center',
-    justifyContent: 'center',
+  gridRow: {
+    gap: GRID_GAP,
+    paddingHorizontal: GRID_GAP,
   },
-  gridPlaceholderText: {
+  gridItem: {
+    width: GRID_ITEM_SIZE,
+    height: GRID_ITEM_SIZE,
+    backgroundColor: colors.card,
+    borderWidth: 1,
+    borderColor: colors.border,
+  },
+  gridImage: {
+    width: '100%',
+    height: '100%',
+  },
+  emptyGrid: {
+    paddingVertical: 60,
+    paddingHorizontal: 20,
+    alignItems: 'center',
+    gap: 8,
+  },
+  emptyGridText: {
     fontFamily: fonts.display,
-    fontSize: 18,
+    fontSize: 22,
     letterSpacing: 2,
     color: colors.muted,
+  },
+  emptyGridSubtext: {
+    fontFamily: fonts.mono,
+    fontSize: 12,
+    color: colors.muted,
+    textAlign: 'center',
+    lineHeight: 18,
   },
 });

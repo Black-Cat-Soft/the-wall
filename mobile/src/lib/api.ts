@@ -31,9 +31,10 @@ export interface Post {
   imageUrl: string;
   caption: string;
   createdAt: string;
-  author: { id: number; username: string; avatar?: string };
-  likes: { userId: number }[];
-  _count: { likes: number };
+  authorId: number;
+  author: { id: number; username: string; avatar?: string; bio?: string };
+  _count: number; // Like count from backend
+  isLiked: boolean; // Whether current user liked it
 }
 
 export type BumpStatus = 'none' | 'bumped';

@@ -3,18 +3,20 @@ import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { useAuth } from '../context/AuthContext';
 import { colors } from '../lib/theme';
 
-import LoginScreen    from '../screens/Login';
-import RegisterScreen from '../screens/Register';
-import FeedScreen     from '../screens/Feed';
-import ProfileScreen  from '../screens/Profile';
-import BumpScreen     from '../screens/Bump';
+import LoginScreen      from '../screens/Login';
+import RegisterScreen   from '../screens/Register';
+import FeedScreen       from '../screens/Feed';
+import ProfileScreen    from '../screens/Profile';
+import BumpScreen       from '../screens/Bump';
+import PostDetailScreen from '../screens/PostDetail';
 
 export type RootStackParamList = {
-  Login:    undefined;
-  Register: undefined;
-  Feed:     undefined;
-  Profile:  { userId: number };
-  Bump:     undefined;
+  Login:      undefined;
+  Register:   undefined;
+  Feed:       undefined;
+  Profile:    { userId: number };
+  PostDetail: { postId: number };
+  Bump:       undefined;
 };
 
 const Stack = createNativeStackNavigator<RootStackParamList>();
@@ -41,8 +43,9 @@ export default function Navigation() {
       <Stack.Navigator screenOptions={{ headerShown: false, animation: 'slide_from_right' }}>
         {token ? (
           <>
-            <Stack.Screen name="Feed"    component={FeedScreen} />
-            <Stack.Screen name="Profile" component={ProfileScreen} />
+            <Stack.Screen name="Feed"       component={FeedScreen} />
+            <Stack.Screen name="Profile"    component={ProfileScreen} />
+            <Stack.Screen name="PostDetail" component={PostDetailScreen} />
             <Stack.Screen
               name="Bump"
               component={BumpScreen}

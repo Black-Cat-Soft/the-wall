@@ -1,8 +1,9 @@
 // Simple Bump screen - button only
 import { useState, useEffect, useCallback } from 'react';
 import {
-  View, Text, Pressable, StyleSheet, SafeAreaView, StatusBar,
+  View, Text, Pressable, StyleSheet, StatusBar,
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import * as Haptics from 'expo-haptics';
 import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
@@ -65,11 +66,6 @@ export default function BumpScreen() {
     bumpState === 'found' ? BRANDING.HINT_TAP_TO_CONNECT :
     BRANDING.HINT_SIMULATE;
 
-  const nodeColor =
-    bumpState === 'confirmed' ? colors.teal :
-    bumpState === 'found' ? colors.blue :
-    'rgba(37,154,161,0.25)';
-
   const borderColor =
     bumpState === 'confirmed' ? colors.yellow :
     bumpState === 'found' ? colors.teal :
@@ -85,19 +81,7 @@ export default function BumpScreen() {
 
       <Text style={styles.screenTitle}>{BRANDING.CONNECT_SCREEN_TITLE.toUpperCase()}</Text>
 
-      {/* Tap button */}
-      <View style={styles.arena}>
-        <Pressable 
-          style={[styles.node, { backgroundColor: nodeColor, borderColor }]}
-          onPress={devTap}
-        >
-          <Text style={styles.nodeIcon}>
-            {bumpState === 'confirmed' ? '✓' : bumpState === 'found' ? '◉' : '〜'}
-          </Text>
-        </Pressable>
-      </View>
-
-      {/* Info */}
+      {/* Status info */}
       <View style={styles.info}>
         <Text style={[styles.statusText, { color: statusColor }]}>{statusLabel}</Text>
 
@@ -115,6 +99,16 @@ export default function BumpScreen() {
 
         <Text style={styles.hint}>{hint}</Text>
       </View>
+
+      {/* Small bump button at bottom */}
+      <Pressable 
+        style={[styles.bumpBtn, { borderColor }]}
+        onPress={devTap}
+      >
+        <Text style={styles.bumpBtnText}>
+          {bumpState === 'confirmed' ? '✓' : bumpState === 'found' ? 'CONNECT' : 'SIMULATE'}
+        </Text>
+      </Pressable>
     </SafeAreaView>
   );
 }
@@ -124,7 +118,6 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: BG,
     alignItems: 'center',
-    justifyContent: 'space-between',
     paddingVertical: 48,
   },
   closeBtn: {
@@ -132,6 +125,7 @@ const styles = StyleSheet.create({
     top: 56,
     right: 24,
     padding: 6,
+    zIndex: 10,
   },
   closeIcon: {
     fontFamily: fonts.mono,
@@ -145,33 +139,23 @@ const styles = StyleSheet.create({
     color: 'rgba(244,232,193,0.45)',
     textTransform: 'uppercase',
     textAlign: 'center',
+    marginBottom: 20,
   },
-  arena: {
-    width: 280,
-    height: 280,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  node: {
-    width: 120,
-    height: 120,
-    borderRadius: 60,
-    borderWidth: 3,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  nodeIcon: {
-    fontSize: 32,
-    color: colors.cream,
+  animationContainer: {
+    height: '30%',
+    width: '100%',
+    backgroundColor: 'red',
+    marginVertical: 100,
   },
   info: {
     alignItems: 'center',
     gap: 14,
     paddingHorizontal: 28,
+    paddingVertical: 20,
   },
   statusText: {
     fontFamily: fonts.display,
-    fontSize: 32,
+    fontSize: 28,
     letterSpacing: 3,
     textAlign: 'center',
   },
@@ -182,7 +166,7 @@ const styles = StyleSheet.create({
   },
   peerName: {
     fontFamily: fonts.display,
-    fontSize: 24,
+    fontSize: 20,
     letterSpacing: 2,
     color: colors.yellow,
   },
@@ -193,5 +177,18 @@ const styles = StyleSheet.create({
     letterSpacing: 1,
     textAlign: 'center',
     lineHeight: 18,
+  },
+  bumpBtn: {
+    borderWidth: 2,
+    borderRadius: 8,
+    paddingHorizontal: 32,
+    paddingVertical: 14,
+    marginBottom: 20,
+  },
+  bumpBtnText: {
+    fontFamily: fonts.display,
+    fontSize: 16,
+    letterSpacing: 2,
+    color: colors.cream,
   },
 });
