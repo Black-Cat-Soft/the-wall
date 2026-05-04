@@ -1,0 +1,97 @@
+---
+description: Git workflow - always use branches and pull requests
+alwaysApply: true
+---
+
+# Git Workflow Rules
+
+## CRITICAL: Never Push Directly to Main
+
+**ALWAYS follow this workflow for ANY code changes:**
+
+### 1. Create a New Branch
+
+Before making ANY changes:
+
+```bash
+# ❌ NEVER work directly on main
+git checkout main
+git add .
+git commit -m "changes"
+
+# ✅ ALWAYS create a feature branch first
+git checkout -b feature/description-of-work
+# Then make your changes
+```
+
+**Branch naming:**
+- `feature/add-user-profile`
+- `fix/login-bug`
+- `refactor/api-structure`
+
+### 2. Make Changes and Commit
+
+```bash
+# Make your changes
+git add .
+git commit -m "Clear description of what changed"
+```
+
+### 3. Push to Remote Branch
+
+```bash
+# ❌ NEVER push to main
+git push origin main
+
+# ✅ ALWAYS push your feature branch
+git push -u origin feature/your-branch-name
+```
+
+### 4. Create a Pull Request
+
+After pushing your branch:
+
+```bash
+# Use GitHub CLI to create PR
+gh pr create --title "Feature: Description" --body "
+## Summary
+- Brief description of changes
+
+## Test Plan
+- How to test these changes
+"
+```
+
+## What to Do If You Accidentally Commit to Main
+
+If you're on main with uncommitted changes:
+
+```bash
+# 1. Create a new branch with your current changes
+git checkout -b feature/fix-accidental-commit
+
+# 2. Your changes are now on the new branch
+git push -u origin feature/fix-accidental-commit
+
+# 3. Go back to main and reset
+git checkout main
+git pull origin main
+```
+
+## Pull Request Guidelines
+
+**Before creating a PR:**
+- ✅ Test your changes locally
+- ✅ Run linter/type checks if available
+- ✅ Write a clear PR description
+- ✅ Keep PRs small and focused (one feature/fix per PR)
+
+**Never:**
+- ❌ Push directly to `main` branch
+- ❌ Force push without explicit user permission
+- ❌ Merge your own PRs without review
+- ❌ Create giant PRs with multiple unrelated changes
+
+## Summary
+
+**The golden rule: If you're not sure, ask the user before pushing anything.**
