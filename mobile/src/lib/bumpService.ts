@@ -1,48 +1,128 @@
-// Bump service — BLE discovery + UWB ranging
-// Native layer hooks are stubbed; wire in react-native-ble-plx + NearbyInteraction module here.
+import WallBle, {
+  type BlePeerEvent,
+  type BleStateEvent,
+} from '../../modules/wall-ble';
+import { api } from './api';
 
-export type BumpServiceState = 'scanning' | 'found' | 'ranging' | 'confirmed' | 'error';
+export type BumpServiceState =
+  | 'idle'
+  | 'initializing'
+  | 'scanning'
+  | 'connecting'
+  | 'found'
+  | 'confirming'
+  | 'confirmed'
+  | 'error';
 
 export interface NearbyPeer {
   userId: number;
   username: string;
-  avatar?:   string;
-  distance?: number;   // metres, from UWB ranging
+  avatar?: string;
+  rssi?: number;
   sessionToken: string;
 }
 
-type StateListener = (state: BumpServiceState, peer?: NearbyPeer) => void;
+export interface BumpSnapshot {
+  state: BumpServiceState;
+  peer?: NearbyPeer;
+  message?: string;
+}
+
+type StateListener = (snapshot: BumpSnapshot) => void;
+type NativeSubscription = { remove: () => void };
+
+export const BUMP_RSSI_THRESHOLD = -70;
 
 class BumpService {
   private listeners: StateListener[] = [];
-  private state: BumpServiceState = 'scanning';
+  private subscriptions: NativeSubscription[] = [];
+  private snapshot: BumpSnapshot = { state: 'idle' };
 
   on(fn: StateListener) {
     this.listeners.push(fn);
-    return () => { this.listeners = this.listeners.filter(l => l !== fn); };
+    fn(this.snapshot);
+    return () => {
+      this.listeners = this.listeners.filter(listener => listener !== fn);
+    };
   }
 
-  private emit(state: BumpServiceState, peer?: NearbyPeer) {
-    this.state = state;
-    this.listeners.forEach(l => l(state, peer));
+  private emit(snapshot: BumpSnapshot) {
+    this.snapshot = snapshot;
+    this.listeners.forEach(listener => listener(snapshot));
   }
 
-  async startScanning(myUserId: number) {
-    this.emit('scanning');
-    // TODO: start BLE advertisement with {userId: myUserId, sessionToken: generateNonce()}
-    // TODO: start BLE scan for other Wall devices
-    // TODO: on peer discovered → emit('found', peer)
-    // TODO: start UWB ranging session with peer → emit('ranging', peer)
-    // TODO: when UWB distance < 0.5m → emit('confirmed', peer)
+  async startScanning(myUserId: number, username: string) {
+    await this.stopNative();
+
+    if (!WallBle) {
+      this.emit({
+        state: 'error',
+        message: 'BLE needs the iOS development build. It is not available in Expo Go or on web.',
+      });
+      return;
+    }
+
+    this.emit({ state: 'initializing' });
+    this.subscriptions = [
+      WallBle.addListener('onStateChanged', (event: BleStateEvent) => {
+        const state = event.state === 'error' ? 'error' : event.state;
+        this.emit({ state, peer: this.snapshot.peer, message: event.message });
+      }),
+      WallBle.addListener('onPeerChanged', (event: BlePeerEvent) => {
+        this.emit({ state: 'found', peer: event });
+      }),
+    ];
+
+    try {
+      await WallBle.start(myUserId, username);
+    } catch (error) {
+      this.emit({
+        state: 'error',
+        message: error instanceof Error ? error.message : 'Could not start Bluetooth.',
+      });
+    }
   }
 
-  stop() {
-    // TODO: stop BLE scan + advertisement
-    // TODO: stop UWB session
-    this.emit('scanning');
+  isCloseEnough(peer?: NearbyPeer) {
+    return typeof peer?.rssi === 'number' && peer.rssi >= BUMP_RSSI_THRESHOLD;
   }
 
-  getState() { return this.state; }
+  async confirm(peer: NearbyPeer, token: string) {
+    if (!this.isCloseEnough(peer)) {
+      this.emit({ state: 'found', peer, message: 'Bring the phones closer before bumping.' });
+      return;
+    }
+
+    this.emit({ state: 'confirming', peer });
+    try {
+      await api.bumps.create(peer.userId, 'ble', token);
+      await this.stopNative();
+      this.emit({ state: 'confirmed', peer });
+    } catch (error) {
+      this.emit({
+        state: 'error',
+        peer,
+        message: error instanceof Error ? error.message : 'The bump could not be saved.',
+      });
+    }
+  }
+
+  async stop() {
+    await this.stopNative();
+    this.snapshot = { state: 'idle' };
+  }
+
+  getSnapshot() {
+    return this.snapshot;
+  }
+
+  private async stopNative() {
+    this.subscriptions.forEach(subscription => subscription.remove());
+    this.subscriptions = [];
+    if (WallBle) {
+      await WallBle.stop().catch(() => {});
+    }
+  }
 }
 
 export const bumpService = new BumpService();

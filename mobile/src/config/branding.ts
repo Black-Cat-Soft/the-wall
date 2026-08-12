@@ -22,9 +22,9 @@ export const BRANDING = {
   
   // Hints/Instructions
   HINT_BRING_PHONES: 'Bring phones together',
-  HINT_TAP_TO_CONNECT: 'Tap the button to connect',
+  HINT_TAP_TO_CONNECT: 'Bring the phones close, then tap Bump',
   HINT_CONNECTED: `Connected! Their posts appear on your wall.`,
-  HINT_SIMULATE: '(Tap button to simulate proximity)',
+  HINT_SIMULATE: 'Open this screen on both iPhones',
   
   // Backend
   API_URL: process.env.EXPO_PUBLIC_API_URL || 'http://localhost:3000',

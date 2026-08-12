@@ -6,7 +6,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation, useRoute } from '@react-navigation/native';
 import type { NativeStackNavigationProp, NativeStackScreenProps } from '@react-navigation/native-stack';
 import type { RootStackParamList } from '../navigation';
-import { api, type Post } from '../lib/api';
+import { api, resolveAssetUrl, type Post } from '../lib/api';
 import { useAuth } from '../context/AuthContext';
 import Avatar from '../components/Avatar';
 import { colors, fonts } from '../lib/theme';
@@ -92,7 +92,7 @@ export default function PostDetailScreen() {
       <ScrollView showsVerticalScrollIndicator={false}>
         {/* Post Image */}
         <Image
-          source={{ uri: post.imageUrl }}
+          source={{ uri: resolveAssetUrl(post.imageUrl) }}
           style={styles.postImage}
           resizeMode="cover"
         />

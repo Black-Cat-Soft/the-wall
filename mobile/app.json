@@ -14,10 +14,17 @@
     },
     "ios": {
       "supportsTablet": false,
-      "bundleIdentifier": "com.thewall.app",
+      "bundleIdentifier": "com.nicosefair.thewall.dev",
       "infoPlist": {
         "NSBluetoothAlwaysUsageDescription": "The Wall uses Bluetooth to detect nearby users for tapping.",
-        "NSBluetoothPeripheralUsageDescription": "The Wall uses Bluetooth to detect nearby users for tapping.",
+        "NSLocalNetworkUsageDescription": "The Wall connects to the local development server while testing on your iPhone.",
+        "NSAppTransportSecurity": {
+          "NSAllowsLocalNetworking": true
+        },
+        "UIBackgroundModes": [
+          "bluetooth-central",
+          "bluetooth-peripheral"
+        ],
         "NSCameraUsageDescription": "The Wall needs camera access to take photos.",
         "NSPhotoLibraryUsageDescription": "The Wall needs photo library access to share photos.",
         "NSPhotoLibraryAddUsageDescription": "The Wall needs permission to save photos."
@@ -42,6 +49,7 @@
       ]
     },
     "plugins": [
+      "./plugins/with-path-safe-react-native-bundle",
       "expo-font",
       "expo-secure-store",
       [

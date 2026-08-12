@@ -1,8 +1,6 @@
 import { View, Text, Image, StyleSheet } from 'react-native';
 import { colors, fonts } from '../lib/theme';
-import { BRANDING } from '../config/branding';
-
-const BASE = BRANDING.API_URL;
+import { resolveAssetUrl } from '../lib/api';
 
 interface Props {
   username: string;
@@ -16,7 +14,7 @@ export default function Avatar({ username, avatar, size = 36, borderColor = colo
   return (
     <View style={[styles.wrap, { width: size, height: size, borderColor }]}>
       {avatar
-        ? <Image source={{ uri: BASE + avatar }} style={styles.img} />
+        ? <Image source={{ uri: resolveAssetUrl(avatar) }} style={styles.img} />
         : <Text style={[styles.initial, { fontSize: size * 0.45 }]}>{initial}</Text>}
     </View>
   );

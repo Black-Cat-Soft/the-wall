@@ -1,6 +1,11 @@
 import { BRANDING } from '../config/branding';
 const BASE = BRANDING.API_URL;
 
+export function resolveAssetUrl(path?: string) {
+  if (!path) return undefined;
+  return /^(https?:|file:|data:)/.test(path) ? path : BASE + path;
+}
+
 async function request<T>(
   path: string,
   options: RequestInit = {},
@@ -30,7 +35,7 @@ export interface Post {
   id: number;
   imageUrl: string;
   caption: string;
-  createdAt: string;
+  createdAt: string | number;
   authorId: number;
   author: { id: number; username: string; avatar?: string; bio?: string };
   _count: number; // Like count from backend
@@ -58,6 +63,13 @@ export const api = {
       request<Post>('/posts', { method: 'POST', body: form }, token),
     like: (id: number, token: string) =>
       request<{ liked: boolean }>(`/posts/${id}/like`, { method: 'POST' }, token),
+  },
+  bumps: {
+    create: (otherUserId: number, method: 'ble', token: string) =>
+      request<{ success: boolean; method: string }>('/bumps', {
+        method: 'POST',
+        body: JSON.stringify({ otherUserId, method }),
+      }, token),
   },
   users: {
     profile: (id: number, token: string) => request<UserProfile>(`/users/${id}`, {}, token),

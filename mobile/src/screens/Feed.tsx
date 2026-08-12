@@ -6,10 +6,11 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import type { RootStackParamList } from '../navigation';
-import { api, type Post } from '../lib/api';
+import { api, resolveAssetUrl, type Post } from '../lib/api';
 import { useAuth } from '../context/AuthContext';
 import { colors, fonts } from '../lib/theme';
 import Avatar from '../components/Avatar';
+import UploadModal from '../components/UploadModal';
 
 type Nav = NativeStackNavigationProp<RootStackParamList>;
 
@@ -29,6 +30,21 @@ export default function FeedScreen() {
   }, [token]);
 
   useEffect(() => { loadFeed(); }, [loadFeed]);
+
+  const toggleLike = async (post: Post) => {
+    if (!token) return;
+    const nextLiked = !post.isLiked;
+    setPosts(current => current.map(item => item.id === post.id ? {
+      ...item,
+      isLiked: nextLiked,
+      _count: Math.max(0, item._count + (nextLiked ? 1 : -1)),
+    } : item));
+    try {
+      await api.posts.like(post.id, token);
+    } catch {
+      void loadFeed();
+    }
+  };
 
   return (
     <SafeAreaView style={styles.safe}>
@@ -78,7 +94,7 @@ export default function FeedScreen() {
 
               {/* Image */}
               <Image 
-                source={{ uri: item.imageUrl }} 
+                source={{ uri: resolveAssetUrl(item.imageUrl) }}
                 style={styles.postImage}
                 resizeMode="cover"
               />
@@ -92,7 +108,7 @@ export default function FeedScreen() {
                 </Text>
                 <View style={styles.postActions}>
                   <Text style={styles.likeCount}>{item._count} likes</Text>
-                  <Pressable onPress={() => {/* TODO: toggle like */}}>
+                  <Pressable onPress={() => void toggleLike(item)}>
                     <Text style={styles.likeBtn}>{item.isLiked ? '♥' : '♡'}</Text>
                   </Pressable>
                 </View>
@@ -119,6 +135,13 @@ export default function FeedScreen() {
       >
         <Text style={styles.shutterIcon}>◉</Text>
       </Pressable>
+
+      {showUpload && (
+        <UploadModal
+          onClose={() => setShowUpload(false)}
+          onSuccess={() => void loadFeed()}
+        />
+      )}
     </SafeAreaView>
   );
 }
