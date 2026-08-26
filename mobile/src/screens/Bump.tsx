@@ -1,114 +1,171 @@
-// Simple Bump screen - button only
-import { useState, useEffect, useCallback } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import {
-  View, Text, Pressable, StyleSheet, StatusBar,
+  ActivityIndicator,
+  Pressable,
+  StyleSheet,
+  Text,
+  View,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import * as Haptics from 'expo-haptics';
 import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import type { RootStackParamList } from '../navigation';
-import { bumpService, type BumpServiceState, type NearbyPeer } from '../lib/bumpService';
+import {
+  BUMP_RSSI_THRESHOLD,
+  bumpService,
+  type BumpServiceState,
+  type BumpSnapshot,
+} from '../lib/bumpService';
 import { useAuth } from '../context/AuthContext';
 import Avatar from '../components/Avatar';
 import { colors, fonts } from '../lib/theme';
-import { BRANDING } from '../config/branding';
 
 type Nav = NativeStackNavigationProp<RootStackParamList>;
 
 const BG = '#0E2A30';
 
+function proximityLabel(rssi?: number) {
+  if (typeof rssi !== 'number') return 'MEASURING DISTANCE…';
+  if (rssi >= -55) return 'VERY CLOSE';
+  if (rssi >= BUMP_RSSI_THRESHOLD) return 'CLOSE ENOUGH';
+  return 'MOVE PHONES CLOSER';
+}
+
 export default function BumpScreen() {
   const nav = useNavigation<Nav>();
-  const { user } = useAuth();
-  const [bumpState, setBumpState] = useState<BumpServiceState>('scanning');
-  const [peer, setPeer] = useState<NearbyPeer | null>(null);
+  const { token, user } = useAuth();
+  const [snapshot, setSnapshot] = useState<BumpSnapshot>({ state: 'initializing' });
+  const previousState = useRef<BumpServiceState>('idle');
 
-  const onStateChange = useCallback((state: BumpServiceState, p?: NearbyPeer) => {
-    setBumpState(state);
-    if (p) setPeer(p);
-
-    if (state === 'found') {
-      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+  const onStateChange = useCallback((next: BumpSnapshot) => {
+    if (next.state === 'found' && previousState.current !== 'found') {
+      void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
     }
-    if (state === 'confirmed') {
-      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+    if (next.state === 'confirmed' && previousState.current !== 'confirmed') {
+      void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
     }
+    previousState.current = next.state;
+    setSnapshot(next);
   }, []);
 
-  useEffect(() => {
-    const unsub = bumpService.on(onStateChange);
-    if (user) bumpService.startScanning(user.id);
-    return () => { unsub(); bumpService.stop(); };
-  }, [user, onStateChange]);
-
-  // DEV: simulate tap progression
-  const devTap = useCallback(() => {
-    if (bumpState === 'scanning') {
-      onStateChange('found', { userId: 99, username: 'nearby_user', sessionToken: 'dev' });
-    } else if (bumpState === 'found') {
-      onStateChange('confirmed', peer ?? undefined);
+  const start = useCallback(() => {
+    if (user) {
+      void bumpService.startScanning(user.id, user.username);
     }
-  }, [bumpState, peer, onStateChange]);
+  }, [user]);
 
-  const statusColor =
-    bumpState === 'confirmed' ? colors.teal :
-    bumpState === 'found' ? colors.yellow :
-    'rgba(234,167,47,0.6)';
+  useEffect(() => {
+    const unsubscribe = bumpService.on(onStateChange);
+    start();
+    return () => {
+      unsubscribe();
+      void bumpService.stop();
+    };
+  }, [onStateChange, start]);
 
-  const statusLabel =
-    bumpState === 'confirmed' ? `${BRANDING.STATUS_CONFIRMED.toUpperCase()} ✦` :
-    bumpState === 'found' ? (peer?.username.toUpperCase() ?? BRANDING.STATUS_FOUND.toUpperCase()) :
-    BRANDING.STATUS_READY.toUpperCase();
+  const confirm = useCallback(() => {
+    if (snapshot.peer && token) {
+      void bumpService.confirm(snapshot.peer, token);
+    }
+  }, [snapshot.peer, token]);
+
+  const closeEnough = bumpService.isCloseEnough(snapshot.peer);
+  const isBusy = ['initializing', 'scanning', 'connecting', 'confirming'].includes(snapshot.state);
+  const showPeer = Boolean(snapshot.peer) && ['found', 'confirming', 'confirmed'].includes(snapshot.state);
+
+  const title =
+    snapshot.state === 'confirmed' ? 'BUMPED ✦' :
+    snapshot.state === 'found' ? snapshot.peer?.username.toUpperCase() :
+    snapshot.state === 'confirming' ? 'SAVING BUMP…' :
+    snapshot.state === 'connecting' ? 'CHECKING PEER…' :
+    snapshot.state === 'error' ? 'BLUETOOTH PAUSED' :
+    'LOOKING NEARBY';
 
   const hint =
-    bumpState === 'confirmed' ? BRANDING.HINT_CONNECTED :
-    bumpState === 'found' ? BRANDING.HINT_TAP_TO_CONNECT :
-    BRANDING.HINT_SIMULATE;
-
-  const borderColor =
-    bumpState === 'confirmed' ? colors.yellow :
-    bumpState === 'found' ? colors.teal :
-    colors.teal;
+    snapshot.state === 'confirmed' ? 'Connected! Their shots now appear on your wall.' :
+    snapshot.state === 'found' ? proximityLabel(snapshot.peer?.rssi) :
+    snapshot.state === 'connecting' ? 'Found a Wall device. Reading its identity…' :
+    snapshot.state === 'error' ? (snapshot.message ?? 'Bluetooth could not start.') :
+    'Open this screen on both iPhones and bring them together.';
 
   return (
     <SafeAreaView style={styles.safe}>
-      <StatusBar barStyle="light-content" backgroundColor={BG} />
-
       <Pressable style={styles.closeBtn} onPress={() => nav.goBack()} hitSlop={12}>
         <Text style={styles.closeIcon}>✕</Text>
       </Pressable>
 
-      <Text style={styles.screenTitle}>{BRANDING.CONNECT_SCREEN_TITLE.toUpperCase()}</Text>
+      <Text style={styles.screenTitle}>BUMP SOMEBODY</Text>
 
-      {/* Status info */}
+      <View style={styles.radar}>
+        <View style={[styles.ring, styles.ringOuter]} />
+        <View style={[styles.ring, styles.ringMiddle]} />
+        <View style={[styles.ring, styles.ringInner]} />
+        <View style={[styles.centerDot, showPeer && styles.centerDotFound]} />
+      </View>
+
       <View style={styles.info}>
-        <Text style={[styles.statusText, { color: statusColor }]}>{statusLabel}</Text>
+        <Text style={[styles.statusText, snapshot.state === 'confirmed' && styles.confirmedText]}>
+          {title}
+        </Text>
 
-        {(bumpState === 'found' || bumpState === 'confirmed') && peer && (
+        {showPeer && snapshot.peer && (
           <View style={styles.peerRow}>
             <Avatar
-              username={peer.username}
-              avatar={peer.avatar}
+              username={snapshot.peer.username}
+              avatar={snapshot.peer.avatar}
               size={48}
-              borderColor={bumpState === 'confirmed' ? colors.teal : colors.yellow}
+              borderColor={snapshot.state === 'confirmed' ? colors.teal : colors.yellow}
             />
-            <Text style={styles.peerName}>{peer.username.toUpperCase()}</Text>
+            <View>
+              <Text style={styles.peerName}>{snapshot.peer.username.toUpperCase()}</Text>
+              {typeof snapshot.peer.rssi === 'number' && (
+                <Text style={styles.signal}>SIGNAL {snapshot.peer.rssi} dBm</Text>
+              )}
+            </View>
           </View>
         )}
 
         <Text style={styles.hint}>{hint}</Text>
+        {snapshot.message && snapshot.state === 'found' && (
+          <Text style={styles.warning}>{snapshot.message}</Text>
+        )}
       </View>
 
-      {/* Small bump button at bottom */}
-      <Pressable 
-        style={[styles.bumpBtn, { borderColor }]}
-        onPress={devTap}
-      >
-        <Text style={styles.bumpBtnText}>
-          {bumpState === 'confirmed' ? '✓' : bumpState === 'found' ? 'CONNECT' : 'SIMULATE'}
-        </Text>
-      </Pressable>
+      <View style={styles.actions}>
+        {isBusy && snapshot.state !== 'confirming' && (
+          <View style={styles.busyRow}>
+            <ActivityIndicator color={colors.yellow} />
+            <Text style={styles.busyText}>BLE ACTIVE</Text>
+          </View>
+        )}
+
+        {snapshot.state === 'found' && (
+          <Pressable
+            style={[styles.bumpBtn, !closeEnough && styles.bumpBtnDisabled]}
+            onPress={confirm}
+            disabled={!closeEnough}
+          >
+            <Text style={styles.bumpBtnText}>{closeEnough ? 'BUMP' : 'GET CLOSER'}</Text>
+          </Pressable>
+        )}
+
+        {snapshot.state === 'confirming' && (
+          <ActivityIndicator color={colors.yellow} size="large" />
+        )}
+
+        {snapshot.state === 'confirmed' && (
+          <Pressable style={styles.bumpBtn} onPress={() => nav.goBack()}>
+            <Text style={styles.bumpBtnText}>BACK TO WALL</Text>
+          </Pressable>
+        )}
+
+        {snapshot.state === 'error' && (
+          <Pressable style={styles.bumpBtn} onPress={start}>
+            <Text style={styles.bumpBtnText}>TRY AGAIN</Text>
+          </Pressable>
+        )}
+      </View>
     </SafeAreaView>
   );
 }
@@ -118,7 +175,8 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: BG,
     alignItems: 'center',
-    paddingVertical: 48,
+    paddingHorizontal: 24,
+    paddingVertical: 32,
   },
   closeBtn: {
     position: 'absolute',
@@ -137,28 +195,52 @@ const styles = StyleSheet.create({
     fontSize: 13,
     letterSpacing: 4,
     color: 'rgba(244,232,193,0.45)',
-    textTransform: 'uppercase',
-    textAlign: 'center',
-    marginBottom: 20,
+    marginTop: 14,
   },
-  animationContainer: {
-    height: '30%',
-    width: '100%',
-    backgroundColor: 'red',
-    marginVertical: 100,
+  radar: {
+    width: 240,
+    height: 240,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginTop: 42,
+  },
+  ring: {
+    position: 'absolute',
+    borderWidth: 1,
+    borderColor: 'rgba(37,176,154,0.28)',
+    borderRadius: 999,
+  },
+  ringOuter: { width: 240, height: 240 },
+  ringMiddle: { width: 164, height: 164 },
+  ringInner: { width: 88, height: 88 },
+  centerDot: {
+    width: 22,
+    height: 22,
+    borderRadius: 11,
+    backgroundColor: colors.yellow,
+    shadowColor: colors.yellow,
+    shadowOpacity: 0.8,
+    shadowRadius: 18,
+  },
+  centerDotFound: {
+    backgroundColor: colors.teal,
+    shadowColor: colors.teal,
+    transform: [{ scale: 1.35 }],
   },
   info: {
     alignItems: 'center',
     gap: 14,
-    paddingHorizontal: 28,
-    paddingVertical: 20,
+    paddingTop: 26,
+    width: '100%',
   },
   statusText: {
     fontFamily: fonts.display,
     fontSize: 28,
     letterSpacing: 3,
+    color: colors.yellow,
     textAlign: 'center',
   },
+  confirmedText: { color: colors.teal },
   peerRow: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -170,20 +252,53 @@ const styles = StyleSheet.create({
     letterSpacing: 2,
     color: colors.yellow,
   },
+  signal: {
+    fontFamily: fonts.mono,
+    fontSize: 9,
+    color: 'rgba(244,232,193,0.5)',
+    marginTop: 3,
+  },
   hint: {
     fontFamily: fonts.mono,
     fontSize: 11,
-    color: 'rgba(244,232,193,0.45)',
-    letterSpacing: 1,
+    color: 'rgba(244,232,193,0.55)',
+    letterSpacing: 0.7,
     textAlign: 'center',
     lineHeight: 18,
+    maxWidth: 310,
+  },
+  warning: {
+    fontFamily: fonts.mono,
+    fontSize: 10,
+    color: colors.yellow,
+    textAlign: 'center',
+  },
+  actions: {
+    flex: 1,
+    justifyContent: 'flex-end',
+    paddingBottom: 12,
+  },
+  busyRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+  },
+  busyText: {
+    fontFamily: fonts.mono,
+    fontSize: 10,
+    color: 'rgba(244,232,193,0.55)',
+    letterSpacing: 1.5,
   },
   bumpBtn: {
     borderWidth: 2,
+    borderColor: colors.teal,
     borderRadius: 8,
-    paddingHorizontal: 32,
+    paddingHorizontal: 34,
     paddingVertical: 14,
-    marginBottom: 20,
+  },
+  bumpBtnDisabled: {
+    borderColor: 'rgba(244,232,193,0.3)',
+    opacity: 0.6,
   },
   bumpBtnText: {
     fontFamily: fonts.display,

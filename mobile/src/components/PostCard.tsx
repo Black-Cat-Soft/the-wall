@@ -4,19 +4,17 @@ import * as Haptics from 'expo-haptics';
 import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import type { RootStackParamList } from '../navigation';
-import { api, type Post } from '../lib/api';
+import { api, resolveAssetUrl, type Post } from '../lib/api';
 import { useAuth } from '../context/AuthContext';
 import Avatar from './Avatar';
 import { colors, fonts } from '../lib/theme';
-import { BRANDING } from '../config/branding';
-
-const BASE = BRANDING.API_URL;
 const SCREEN_W = Dimensions.get('window').width;
 const SPROCKET_COUNT = 7;
 const sprockets = Array.from({ length: SPROCKET_COUNT });
 
-function timeAgo(iso: string) {
-  const secs = Math.floor((Date.now() - new Date(iso).getTime()) / 1000);
+function timeAgo(value: string | number) {
+  const timestamp = typeof value === 'number' && value < 10_000_000_000 ? value * 1000 : value;
+  const secs = Math.floor((Date.now() - new Date(timestamp).getTime()) / 1000);
   if (secs < 60) return 'just now';
   if (secs < 3600) return `${Math.floor(secs / 60)}m`;
   if (secs < 86400) return `${Math.floor(secs / 3600)}h`;
@@ -32,9 +30,9 @@ export default function PostCard({ post, currentUserId, index }: {
 }) {
   const { token } = useAuth();
   const nav = useNavigation<Nav>();
-  const initialLiked = post.likes.some(l => l.userId === currentUserId);
+  const initialLiked = post.isLiked;
   const [liked, setLiked] = useState(initialLiked);
-  const [count, setCount] = useState(post._count.likes);
+  const [count, setCount] = useState(post._count);
 
   const handleLike = async () => {
     if (!token) return;
@@ -76,7 +74,7 @@ export default function PostCard({ post, currentUserId, index }: {
         {/* photo */}
         <View style={styles.imageWrap}>
           <Image
-            source={{ uri: BASE + post.imageUrl }}
+            source={{ uri: resolveAssetUrl(post.imageUrl) }}
             style={styles.image}
             resizeMode="cover"
           />

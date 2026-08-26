@@ -1,10 +1,15 @@
 package main
 
 import (
+	"crypto/rand"
+	"encoding/hex"
 	"encoding/json"
+	"fmt"
+	"io"
 	"log"
 	"net/http"
 	"os"
+	"path/filepath"
 	"strconv"
 	"time"
 
@@ -151,18 +156,77 @@ func handleGetFeed(w http.ResponseWriter, r *http.Request) {
 func handleCreatePost(w http.ResponseWriter, r *http.Request) {
 	userID := r.Context().Value(UserIDKey).(int)
 
-	var req struct {
-		ImageURL string `json:"imageUrl"`
-		Caption  string `json:"caption"`
-	}
-
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		http.Error(w, `{"error":"Invalid request"}`, http.StatusBadRequest)
+	const maxUploadSize = 10 << 20
+	r.Body = http.MaxBytesReader(w, r.Body, maxUploadSize+(1<<20))
+	if err := r.ParseMultipartForm(maxUploadSize); err != nil {
+		http.Error(w, `{"error":"Photo must be 10 MB or smaller"}`, http.StatusBadRequest)
 		return
 	}
 
-	post, err := CreatePost(req.ImageURL, req.Caption, userID)
+	file, _, err := r.FormFile("image")
 	if err != nil {
+		http.Error(w, `{"error":"Photo is required"}`, http.StatusBadRequest)
+		return
+	}
+	defer file.Close()
+
+	header := make([]byte, 512)
+	n, readErr := io.ReadFull(file, header)
+	if readErr != nil && readErr != io.ErrUnexpectedEOF {
+		http.Error(w, `{"error":"Could not read photo"}`, http.StatusBadRequest)
+		return
+	}
+	header = header[:n]
+
+	extensions := map[string]string{
+		"image/jpeg": ".jpg",
+		"image/png":  ".png",
+		"image/webp": ".webp",
+	}
+	ext, ok := extensions[http.DetectContentType(header)]
+	if !ok {
+		http.Error(w, `{"error":"Use a JPEG, PNG, or WebP photo"}`, http.StatusBadRequest)
+		return
+	}
+
+	if err := os.MkdirAll("uploads", 0o755); err != nil {
+		http.Error(w, `{"error":"Could not prepare uploads"}`, http.StatusInternalServerError)
+		return
+	}
+
+	randomBytes := make([]byte, 12)
+	if _, err := rand.Read(randomBytes); err != nil {
+		http.Error(w, `{"error":"Could not prepare photo"}`, http.StatusInternalServerError)
+		return
+	}
+	filename := fmt.Sprintf("%d-%s%s", userID, hex.EncodeToString(randomBytes), ext)
+	destinationPath := filepath.Join("uploads", filename)
+	destination, err := os.OpenFile(destinationPath, os.O_WRONLY|os.O_CREATE|os.O_EXCL, 0o644)
+	if err != nil {
+		http.Error(w, `{"error":"Could not save photo"}`, http.StatusInternalServerError)
+		return
+	}
+
+	remainingLimit := maxUploadSize - int64(len(header))
+	copied := int64(0)
+	if _, err = destination.Write(header); err == nil {
+		copied, err = io.Copy(destination, io.LimitReader(file, remainingLimit+1))
+	}
+	closeErr := destination.Close()
+	if copied > remainingLimit {
+		_ = os.Remove(destinationPath)
+		http.Error(w, `{"error":"Photo must be 10 MB or smaller"}`, http.StatusBadRequest)
+		return
+	}
+	if err != nil || closeErr != nil {
+		_ = os.Remove(destinationPath)
+		http.Error(w, `{"error":"Could not save photo"}`, http.StatusInternalServerError)
+		return
+	}
+
+	post, err := CreatePost("/uploads/"+filename, r.FormValue("caption"), userID)
+	if err != nil {
+		_ = os.Remove(destinationPath)
 		http.Error(w, `{"error":"Failed to create post"}`, http.StatusInternalServerError)
 		return
 	}

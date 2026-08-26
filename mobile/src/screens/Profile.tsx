@@ -6,7 +6,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation, useRoute } from '@react-navigation/native';
 import type { NativeStackNavigationProp, NativeStackScreenProps } from '@react-navigation/native-stack';
 import type { RootStackParamList } from '../navigation';
-import { api, type UserProfile, type Post } from '../lib/api';
+import { api, resolveAssetUrl, type UserProfile, type Post } from '../lib/api';
 import { useAuth } from '../context/AuthContext';
 import { colors, fonts } from '../lib/theme';
 
@@ -69,7 +69,7 @@ export default function ProfileScreen() {
       onPress={() => handlePostPress(item)}
     >
       <Image
-        source={{ uri: item.imageUrl }}
+        source={{ uri: resolveAssetUrl(item.imageUrl) }}
         style={styles.gridImage}
         resizeMode="cover"
       />

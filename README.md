@@ -22,11 +22,13 @@ stray/
 │   ├── db.go         Models + all SQL queries
 │   ├── middleware.go  JWT auth middleware
 │   └── schema.sql    Table definitions + seed data
-├── mobile/           React Native (Expo Go)
+├── mobile/           React Native + native iOS development build
+│   ├── modules/      Local Expo modules, including CoreBluetooth BLE
+│   ├── plugins/      Reproducible iOS prebuild configuration
 │   └── src/
 │       ├── config/   branding.ts — app name, copy, API URL
 │       ├── context/  AuthContext
-│       ├── lib/      api.ts, theme.ts, tapService.ts
+│       ├── lib/      api.ts, theme.ts, bumpService.ts
 │       ├── navigation/
 │       ├── screens/  Feed, Profile, Bump, Login, Register
 │       └── components/ PostCard, Avatar, UploadModal
@@ -55,14 +57,19 @@ xcode-select --install
 
 The database is created automatically at `./data/app.db` on first run. Schema is applied via `schema.sql`. Seed users (alice + bob) are inserted via `INSERT OR IGNORE` in `schema.sql`.
 
-### Mobile (Expo Go)
+### Mobile (iOS development build)
 
 ```bash
 cd mobile
-npx expo start
+npm ci
+npx expo prebuild --platform ios --clean
+npx expo run:ios --device
 ```
 
-Scan the QR code with Expo Go on your phone. Phone and Mac must be on the same WiFi network.
+BLE is implemented in a local native module, so it does not run in Expo Go. Use the generated
+`ios/TheWall.xcworkspace` in Xcode or `npx expo run:ios --device`. Select your Apple development
+team when Xcode asks for signing. The iPhone and Mac must be on the same Wi-Fi network while the
+API and Metro are running.
 
 **Set your local IP in `mobile/.env`:**
 
@@ -76,6 +83,11 @@ ipconfig getifaddr en0
 ```
 
 Use `npx expo install` (not `npm install`) when adding new packages — it pins versions compatible with the current Expo SDK.
+
+The iOS Simulator is useful for UI, TypeScript, Swift, and linking checks, but it cannot perform
+the real phone-to-phone BLE exchange. Test proximity with two physical iPhones, two signed
+development-build installs, and two different logged-in users. See the complete
+[iPhone installation and testing guide](docs/ios-device-testing.md).
 
 ### Frontend (web)
 
@@ -115,4 +127,14 @@ All protected routes require `Authorization: Bearer <token>`.
 
 ## The bump mechanic
 
-Bumping is how you connect on Stray. In production this will use BLE + UWB proximity detection — phones confirm they're physically close before creating a connection. For now it's stubbed: the bump screen simulates the flow on tap, and the profile page has a manual bump button for testing.
+Bumping is how you connect on Stray. The iOS MVP now uses CoreBluetooth directly: while both users
+have the Bump screen open, each phone advertises a small identity payload, scans for the Stray BLE
+service, connects, reads the nearby identity, and measures RSSI. The Bump button unlocks at `-70 dBm`
+or stronger, then the app records the connection through `POST /bumps` with method `ble`.
+
+This is an MVP proximity signal, not a production trust boundary. A later hardening pass should use
+server-issued, short-lived challenges with confirmation from both authenticated users. UWB / Nearby
+Interaction is also a separate next phase; it is not part of the current BLE build.
+
+The physical-device verification record, known limitations, and durable image-storage roadmap are
+documented in the [BLE MVP test report](docs/ble-mvp-test-report.md).
