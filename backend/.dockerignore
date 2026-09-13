@@ -5,3 +5,8 @@ uploads
 *.db-wal
 .git
 .gitignore
+.env
+.env.*
+*.pem
+*.key
+server

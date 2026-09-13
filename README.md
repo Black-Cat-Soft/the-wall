@@ -18,10 +18,13 @@ A retro photo-sharing app where your network is built in person — not online. 
 ```
 stray/
 ├── backend/          Go API
-│   ├── main.go       Router + all handlers
+│   ├── main.go       Entry point + API handlers
+│   ├── config.go     Environment validation
+│   ├── server.go     HTTP routing + process lifecycle
 │   ├── db.go         Models + all SQL queries
 │   ├── middleware.go  JWT auth middleware
-│   └── schema.sql    Table definitions + seed data
+│   ├── schema.sql    Table definitions (embedded in binary)
+│   └── seed.sql      Optional local demo data
 ├── mobile/           React Native + native iOS development build
 │   ├── modules/      Local Expo modules, including CoreBluetooth BLE
 │   ├── plugins/      Reproducible iOS prebuild configuration
@@ -46,16 +49,59 @@ stray/
 
 ```bash
 cd backend
+export JWT_SECRET="$(openssl rand -hex 32)"  # keep stable between restarts
 go run .             # http://localhost:3000
 ```
 
-Requires Go 1.22+ and a C compiler (for CGO/SQLite). On Mac, Xcode command line tools cover this:
+Requires Go 1.26+ and a C compiler (for CGO/SQLite). On Mac, Xcode command line tools cover this:
 
 ```bash
 xcode-select --install
 ```
 
-The database is created automatically at `./data/app.db` on first run. Schema is applied via `schema.sql`. Seed users (alice + bob) are inserted via `INSERT OR IGNORE` in `schema.sql`.
+The database directory is created automatically at `./data/app.db` on first run. Table definitions
+are embedded from `schema.sql`. Startup requires a `JWT_SECRET` of at least 32 characters; generate
+a random value, store it outside Git, and reuse it across deployments so existing tokens remain valid.
+For local demo accounts, set `SEED_DEMO_DATA=true` when starting an empty database. Seeding is off
+by default and does not run again once users exist. Existing databases are preserved, including any
+old demo users; use a fresh database volume for a cloud test environment.
+
+### Container deployment
+
+Build the Linux image for an x86 EC2 instance (`t3.micro`, for example):
+
+```bash
+docker build --platform linux/amd64 -t the-wall-backend:dev ./backend
+```
+
+Run a prebuilt image with the deployment configuration:
+
+```bash
+export BACKEND_IMAGE=the-wall-backend:dev
+export JWT_SECRET="$(openssl rand -hex 32)"  # first setup only; store securely for reuse
+docker compose -f compose.deploy.yml up -d
+curl --fail http://127.0.0.1:3000/healthz
+```
+
+`compose.deploy.yml` binds the API to loopback; an HTTPS reverse proxy on the same host must
+provide external access. It stores SQLite and uploads in separate Docker named volumes, runs
+as UID 10001, limits log growth, and allows 15 seconds for a graceful stop. `/healthz` returns
+200 when the database is reachable and 503 when it is unavailable. A Docker health check marks
+status; it does not automatically restart an unhealthy process.
+
+Replace `BACKEND_IMAGE` with a private ECR image **digest** for a cloud release. An image digest
+identifies exact contents; retaining the previous digest allows an application rollback. Database
+schema changes may require a separate migration/rollback plan. Restart with the same JWT secret
+and volumes. Do not use `docker compose down -v` unless intentionally deleting the stored data.
+
+This configuration supports one backend instance. Volumes survive container replacement but do
+not provide backups or protect against deletion/loss of the EC2 disk. Before using real user data,
+add tested backups; moving photos to S3 and adopting a shared database are separate changes for
+multi-instance operation. Use synthetic users/photos for the first test deployment.
+
+The existing `docker-compose.yml` remains the LAN development setup and keeps its original data
+mounts. On Linux, a bind-mounted database directory must be writable by UID 10001. Compose reads
+the root `.env`; `go run .` does not load `.env` automatically.
 
 ### Mobile (iOS development build)
 
@@ -99,7 +145,7 @@ npm run dev          # http://localhost:5173
 
 ## Test accounts
 
-Seeded automatically on first backend run:
+Available only when an empty local database is started with `SEED_DEMO_DATA=true`:
 
 | Email | Password |
 |-------|----------|
@@ -114,6 +160,7 @@ All protected routes require `Authorization: Bearer <token>`.
 
 | Method | Path | Description |
 |--------|------|-------------|
+| GET | `/healthz` | Database readiness |
 | POST | `/auth/register` | Create account |
 | POST | `/auth/login` | Login, returns JWT |
 | GET | `/posts/feed` | Posts from bumped users + own |

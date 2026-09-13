@@ -7,11 +7,12 @@ services:
       dockerfile: Dockerfile
     restart: always
     ports:
-      - "3000:3000"
+      - "${PORT:-3000}:3000"
     environment:
-      PORT: ${PORT}
-      DATABASE_URL: ${DATABASE_URL}
-      JWT_SECRET: ${JWT_SECRET}
+      PORT: "3000"
+      DATABASE_URL: /app/data/app.db
+      JWT_SECRET: ${JWT_SECRET:?Set JWT_SECRET to a randomly generated secret of at least 32 characters}
+      SEED_DEMO_DATA: ${SEED_DEMO_DATA:-false}
     volumes:
       - ./backend/data:/app/data
       - uploads_data:/app/uploads

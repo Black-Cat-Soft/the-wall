@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"crypto/rand"
 	"encoding/hex"
 	"encoding/json"
@@ -9,66 +10,23 @@ import (
 	"log"
 	"net/http"
 	"os"
+	"os/signal"
 	"path/filepath"
 	"strconv"
+	"syscall"
 	"time"
 
 	"github.com/go-chi/chi/v5"
-	"github.com/go-chi/chi/v5/middleware"
-	"github.com/go-chi/cors"
 	"github.com/golang-jwt/jwt/v5"
 	"golang.org/x/crypto/bcrypt"
 )
 
 func main() {
-	// Init database
-	dbPath := getEnv("DATABASE_URL", "./data/app.db")
-	if err := InitDB(dbPath); err != nil {
-		log.Fatal("Failed to init database:", err)
+	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
+	defer stop()
+	if err := run(ctx); err != nil {
+		log.Fatal(err)
 	}
-
-	// Setup router
-	r := chi.NewRouter()
-	r.Use(middleware.Logger)
-	r.Use(middleware.Recoverer)
-	r.Use(cors.Handler(cors.Options{
-		AllowedOrigins:   []string{"*"},
-		AllowedMethods:   []string{"GET", "POST", "PUT", "DELETE", "OPTIONS"},
-		AllowedHeaders:   []string{"Accept", "Authorization", "Content-Type"},
-		AllowCredentials: true,
-	}))
-
-	// Public routes
-	r.Post("/auth/register", handleRegister)
-	r.Post("/auth/login", handleLogin)
-
-	// Protected routes
-	r.Group(func(r chi.Router) {
-		r.Use(AuthMiddleware)
-
-		// Posts
-		r.Get("/posts/feed", handleGetFeed)
-		r.Post("/posts", handleCreatePost)
-		r.Post("/posts/{id}/like", handleToggleLike)
-
-		// Bumps
-		r.Post("/bumps", handleCreateBump)
-		r.Get("/bumps/my-bumps", handleGetMyBumps)
-		r.Delete("/bumps/{userId}", handleDeleteBump)
-
-		// Users
-		r.Get("/users/{id}", handleGetUser)
-		r.Post("/users/{id}/bump", handleToggleBump)
-	})
-
-	// Static files (uploads)
-	workDir, _ := os.Getwd()
-	filesDir := http.Dir(workDir + "/uploads")
-	r.Handle("/uploads/*", http.StripPrefix("/uploads/", http.FileServer(filesDir)))
-
-	port := getEnv("PORT", "3000")
-	log.Printf("🚀 Server running on port %s", port)
-	log.Fatal(http.ListenAndServe(":"+port, r))
 }
 
 // Auth handlers
