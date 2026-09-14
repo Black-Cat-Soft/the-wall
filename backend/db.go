@@ -2,13 +2,22 @@ package main
 
 import (
 	"database/sql"
+	_ "embed"
+	"fmt"
 	"log"
 	"os"
+	"path/filepath"
 
 	_ "github.com/mattn/go-sqlite3"
 )
 
 var DB *sql.DB
+
+//go:embed schema.sql
+var schemaSQL string
+
+//go:embed seed.sql
+var seedSQL string
 
 // Models
 type User struct {
@@ -55,32 +64,51 @@ type Bump struct {
 }
 
 // Initialize database
-func InitDB(dbPath string) error {
-	var err error
-	DB, err = sql.Open("sqlite3", dbPath)
+func InitDB(dbPath string, seedDemo bool) error {
+	if err := os.MkdirAll(filepath.Dir(dbPath), 0o750); err != nil {
+		return err
+	}
+	db, err := sql.Open("sqlite3", dbPath)
 	if err != nil {
 		return err
 	}
-
-	DB.SetMaxOpenConns(1) // SQLite only supports 1 writer
-
-	// Enable foreign keys
-	if _, err := DB.Exec("PRAGMA foreign_keys = ON"); err != nil {
+	db.SetMaxOpenConns(1) // Serialize writers for this single-instance SQLite service.
+	if err := initializeSchema(db, seedDemo); err != nil {
+		_ = db.Close()
 		return err
 	}
-
-	// Run schema
-	schema, err := os.ReadFile("schema.sql")
-	if err != nil {
-		return err
-	}
-
-	if _, err := DB.Exec(string(schema)); err != nil {
-		return err
-	}
-
-	log.Println("✅ Database initialized")
+	DB = db
+	log.Println("Database initialized")
 	return nil
+}
+
+func initializeSchema(db *sql.DB, seedDemo bool) error {
+	if _, err := db.Exec("PRAGMA foreign_keys = ON"); err != nil {
+		return err
+	}
+	if _, err := db.Exec(schemaSQL); err != nil {
+		return err
+	}
+	if !seedDemo {
+		return nil
+	}
+	// Seed only an empty database, so restarting never duplicates demo posts.
+	var userCount int
+	if err := db.QueryRow("SELECT COUNT(*) FROM users").Scan(&userCount); err != nil {
+		return err
+	}
+	if userCount != 0 {
+		return nil
+	}
+	tx, err := db.Begin()
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
+	if _, err := tx.Exec(seedSQL); err != nil {
+		return fmt.Errorf("seed demo data: %w", err)
+	}
+	return tx.Commit()
 }
 
 // User queries

@@ -1,0 +1,34 @@
+# Run a prebuilt image on one host. Put HTTPS in front of the loopback port.
+name: the-wall-test
+
+services:
+  backend:
+    image: ${BACKEND_IMAGE:?Set BACKEND_IMAGE to the ECR image digest}
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:3000:3000"
+    environment:
+      PORT: "3000"
+      DATABASE_URL: /app/data/app.db
+      JWT_SECRET: ${JWT_SECRET:?Set JWT_SECRET to a randomly generated secret of at least 32 characters}
+      SEED_DEMO_DATA: "false"
+    volumes:
+      - database:/app/data
+      - uploads:/app/uploads
+    read_only: true
+    tmpfs:
+      - /tmp:size=32m,mode=1777
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+    stop_grace_period: 15s
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+volumes:
+  database:
+  uploads:
