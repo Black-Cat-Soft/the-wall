@@ -58,7 +58,8 @@ volumes:
 """
     return "\n".join([
         "#!/bin/bash", "set -euo pipefail",
-        "cloud-init status --wait",
+        "test -f /opt/the-wall/bootstrap.ready",
+        "systemctl is-active --quiet docker",
         "test -s /opt/the-wall/runtime.env",
         "cd /opt/the-wall", "umask 077",
         write_file("compose.deploy.yml", compose),
@@ -68,9 +69,9 @@ volumes:
         "wall_docker_config=$(mktemp -d)",
         "trap 'rm -rf \"$wall_docker_config\"' EXIT",
         "aws ecr get-login-password --region " + shlex.quote(region) + " | docker --config \"$wall_docker_config\" login --username AWS --password-stdin " + shlex.quote(registry),
-        'docker --config "$wall_docker_config" compose --env-file runtime.env --env-file image.env -f compose.deploy.yml -f compose.tls.yml pull',
-        'docker --config "$wall_docker_config" compose --env-file runtime.env --env-file image.env -f compose.deploy.yml -f compose.tls.yml up -d',
-        "curl --fail --retry 10 --retry-connrefused --retry-delay 2 http://127.0.0.1:3000/healthz",
+        'docker --config "$wall_docker_config" compose --env-file runtime.env --env-file image.env -f compose.deploy.yml -f compose.tls.yml pull --quiet',
+        'docker --config "$wall_docker_config" compose --env-file runtime.env --env-file image.env -f compose.deploy.yml -f compose.tls.yml up -d --wait --wait-timeout 120',
+        "curl --fail --silent --show-error --retry 10 --retry-all-errors --retry-delay 2 http://127.0.0.1:3000/healthz",
     ]) + "\n"
 
 

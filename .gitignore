@@ -29,3 +29,4 @@ backend/uploads/
 # AWS deployment helper state
 __pycache__/
 /wall-state.json
+/wall-smoke-state.json

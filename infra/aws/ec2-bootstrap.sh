@@ -2,7 +2,9 @@
 # Amazon Linux 2023: prepare the host. Application deployment is a separate step.
 set -euo pipefail
 
-dnf install -y docker amazon-ssm-agent openssl curl
+# Amazon Linux already provides curl-minimal, which supports HTTPS downloads.
+# Installing the full curl package conflicts with that preinstalled package.
+dnf install -y docker amazon-ssm-agent openssl
 systemctl enable --now docker amazon-ssm-agent
 
 # Install a specific official Docker Compose release and verify its checksum.
@@ -23,3 +25,4 @@ if [ ! -e /opt/the-wall/runtime.env ]; then
 fi
 
 docker compose version
+touch /opt/the-wall/bootstrap.ready
